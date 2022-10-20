@@ -2,10 +2,12 @@
 library(here)
 library(tidyverse)
 library(igraph)
+library(colorspace)
 set.seed(50)
 
 set_here('/media/sagesteppe/ExternalHD/GraphModulesEsds')
 p <- file.path(here(), 'data/processed')
+p <- file.path('/media/sagesteppe/ExternalHD/GraphModulesEsds/data/processed')
 focal_esds <- read.csv(file.path(p, 'focalESDs.csv')) 
 first_esds <- read.csv(file.path(p, 'firstESDs.csv')) %>% 
   filter(TYPE != 'REJECTED') # THESE FAR SOUTH NEW MEXICO
@@ -46,7 +48,7 @@ second_esds %>%
   mutate(across(.cols = c(FROM, TO), ~str_replace(.x, '^[R]O', 'R0'))) %>% 
   filter(!TO %in% FROM) %>% 
   # which esds are just missing/?
-  filter(!TO %in% status$EcologicalSiteId, # silly nm ones dealt w/ below.
+  filter(!TO %in% status$EcologicalSiteId, # silly nm removed below
          !TO %in% c('R042BB006NM', 'R042BB014NM')) %>% 
   select(FROM = TO) %>% 
   distinct() %>% 
@@ -75,70 +77,59 @@ n1 <- second_esds %>%
 ggplot(n1, aes( x = LINK, y = n)) +
   geom_line() +
   theme_classic() +
-  labs(title = "Number of unique associated ESD's at links from AIM Plots", 
-       y = 'Number of new ESDs', x = 'Links') +
+  labs(
+    title = "Number of unique ESD's at links from AIM Plots",
+       y = 'Number of novel ESDs', x = 'Link Distance from AIM Plot') +
   lims(y = c(0,50)) +
-  scale_x_continuous(breaks=c(0,1,2))
+  scale_x_continuous(breaks=c(0,1,2)) +
+  theme(plot.title = element_text(hjust = 0.5))
 
 
 esds <- second_esds %>% select(FROM, TO, TYPE)
-
 graph <- as.undirected(graph_from_data_frame(esds))
-
+lay <- layout_with_fr(graph) 
 
 plot(graph, vertex.label=NA,
-     
      vertex.shape = 'circle',
-     
      edge.color = 'cadetblue',
      vertex.color = 'chocolate',
-  #   edge.width = 2, 
-    # edge.arrow.size = 1,
-    # edge.arrow.width = 1, 
-   #  edge.lty = 0.3, 
-   #  edge.curved = T,
-
-     
-     main = 'Networks of ESD Similarity'
-     
+     main = 'Networks of ESD Similarity',
+     layout = lay
      )
 
-
-communityMulti$membership
-communityMulti$modularity
-
 V(graph)$degree <- degree(graph)
-communityMulti <- multilevel.community(graph)
-V(graph)$color <- membership(communityMulti) # but need sync up. 
+V(graph)$color <- membership(communityMulti) 
 
-V(graph)$color
-lay <- layout_with_fr(graph)
+cols <- qualitative_hcl(9, palette = "Dark 3")
+
+for (i in 1:max(membership(communityMulti))){
+  V(graph)$color[V(graph)$color == i] <- cols[i]
+}
+
+cols_trans <- adjust_transparency(cols, alpha = 0.3) 
 
 par(bg = 'black')
 plot(graph, vertex.label = NA,
+     shape = 'sphere',
      mark.groups = communityMulti,
-    # mark.col = c('royalblue1', 'pink3', 'orange4',
-    #              'lightslateblue', 'firebrick1', 'darkorange1', 
-    #              'blue4', 'yellow', 'thistle'),
+     mark.col = cols_trans,
      mark.border = NA,
      edge.color = 'white',
+     lty = 2,
      vertex.size = V(graph)$degree, 
      layout = lay,
-     edge.curved = 0.1,
-     )
+     edge.curved = 0.2
+     ) +
+  title('Associated Ecological Sites',
+        col.main = "white")
 
+#dev.off()
 
-colors()
+rm(lay, n1, cols, cols_trans, i)
 
-c('royalblue1', 'pink3', 'orange4',
-'lightslateblue', 'firebrick1', 'darkorange1', 
-'blue4', 'yellow', 'thistle')
+communityMulti <- multilevel.community(graph)
+members  <- tibble('Module' = communityMulti$membership)
 
+esd_graph <- as_long_data_frame(graph) %>%
+  left_join(., members, by = c('to' = 'Module'))
 
-unique(communityMulti)
-
-An Ecological Site Description is used to by Land Management Agencies to group similar areas, or motifs, across a landscape. In theory these ecological sites, due to their similar biophysical, and climatic properties have similar soils and vegetation, and should respond in similar manners to land management. A tradeoff exists between producing many narrow descriptions, and several broader descriptions. 
-
-In general the landscapes with ESD's completed are *somewhat* homogenous. However, a number of rare sites are still present. I argue that we can form, and as *needed* utilize broader conceptions of ESD's to supply context for rare sites across the landscape.
-
-Here we utilize an Assess, Inventory, and Monitor (AIM) sample design, which had ESD verification occur at 130 plots to serve as a focal group of ESD's. From this focal group we branch outwards along the ESD documents 'similar and associated sites' (this name... my own) sections to develop a framework for relating the ESD's using simple binary and undirected associations. 
