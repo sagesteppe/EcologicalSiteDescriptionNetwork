@@ -88,6 +88,7 @@ ggplot(n1, aes( x = LINK, y = n)) +
 esds <- second_esds %>% select(FROM, TO, TYPE)
 graph <- as.undirected(graph_from_data_frame(esds))
 lay <- layout_with_fr(graph) 
+communityMulti <- multilevel.community(graph)
 
 plot(graph, vertex.label=NA,
      vertex.shape = 'circle',
@@ -97,10 +98,9 @@ plot(graph, vertex.label=NA,
      layout = lay
      )
 
+cols <- qualitative_hcl(9, palette = "Dark 3")
 V(graph)$degree <- degree(graph)
 V(graph)$color <- membership(communityMulti) 
-
-cols <- qualitative_hcl(9, palette = "Dark 3")
 
 for (i in 1:max(membership(communityMulti))){
   V(graph)$color[V(graph)$color == i] <- cols[i]
@@ -121,15 +121,25 @@ plot(graph, vertex.label = NA,
      edge.curved = 0.2
      ) +
   title('Associated Ecological Sites',
-        col.main = "white")
+        col.main = "white") +
+ # legend(x= -0.25, y=-1.35, legend_items, 
+#                    pch=21, col="#777777", 
+#                    pt.bg=node_clrs, 
+#                    pt.cex=2, cex=.8, bty="n", ncol=1)
 
-#dev.off()
+#dev.off()s
 
 rm(lay, n1, cols, cols_trans, i)
 
-communityMulti <- multilevel.community(graph)
-members  <- tibble('Module' = communityMulti$membership)
+
+
+# igraph_community_optimal_modularity
+
+members  <- tibble(
+  'to' = 1:length(communityMulti$membership),
+  'Module' = communityMulti$membership)
+)
 
 esd_graph <- as_long_data_frame(graph) %>%
-  left_join(., members, by = c('to' = 'Module'))
+  left_join(., members, by = 'to')
 
