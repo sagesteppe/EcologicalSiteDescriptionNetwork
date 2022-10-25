@@ -1,18 +1,19 @@
-
 library(here)
 library(tidyverse)
 library(igraph)
 library(colorspace)
 set.seed(50)
 
-set_here('/media/sagesteppe/ExternalHD/GraphModulesEsds')
-p <- file.path(here(), 'data/processed')
 p <- file.path('/media/sagesteppe/ExternalHD/GraphModulesEsds/data/processed')
 focal_esds <- read.csv(file.path(p, 'focalESDs.csv')) 
 first_esds <- read.csv(file.path(p, 'firstESDs.csv')) %>% 
   filter(TYPE != 'REJECTED') # THESE FAR SOUTH NEW MEXICO
 second_esds <- read.delim(file.path(p, 'secondESDs.csv')) %>% 
   filter(TYPE != 'REJECTED') # THESE NEW MEXICO OR SMALL POCKETS IN CENTRAL UT
+
+plots <- read.csv(file.path('/media/sagesteppe/ExternalHD/GraphModulesEsds/data/raw', 
+                    'sitesFORreferences.csv')) %>% 
+  filter(EcologicalSiteId != 'UNKNOWN')
 
 status <- read.csv(file.path(p, 'ESDpublicationStatus.csv')) %>% 
   select(EcologicalSiteId, ASSOCIATION) %>% 
@@ -28,7 +29,7 @@ focal_esds %>%
   distinct() %>% 
   mutate('ASSOCIATION' = '', 
          'TO' = '') %>% 
-  write.csv(file.path(here(),'data/processed/first.csv'), row.names = F)
+  write.csv(file.path(p,'first.csv'), row.names = F)
 
 # now two links away from our AIM Plots
 first_esds %>% 
@@ -41,7 +42,7 @@ first_esds %>%
   distinct() %>% 
   mutate('ASSOCIATION' = '', 
          'TO' = '') %>% 
-  write.csv(file.path(here(),'data/processed/second.csv'), row.names = F)
+  write.csv(file.path(p,'second.csv'), row.names = F)
 
 # three links away
 second_esds %>% 
@@ -54,27 +55,66 @@ second_esds %>%
   distinct() %>% 
   mutate('ASSOCIATION' = '', 
          'TO' = '') %>% 
-  write.csv(file.path(here(),'data/processed/third.csv'), row.names = F)
+  write.csv(file.path(p, 'third.csv'), row.names = F)
 
 rm(status, focal_esds, first_esds)
 
+
+
+# RESULT ONE - HOW MANY PLOTS HAD THEIR ESD'S VERIFIED?
+
+praw <- '/media/sagesteppe/ExternalHD/GraphModulesEsds/data/raw'
+
+# RESULT TWO - HOW MANY ESD'S HAD WRITTEN DESCRIPTIONS COMPLETED?
+
+plots <- read.csv(file.path(praw, 'found_ESDs.csv')) %>% 
+  filter(EcologicalSiteId != 'UNKNOWN') 
+
+sum(plots$UFOPlots) # 122 AIM Plots were placed into 
+nrow(plots) # 35 Ecological sites concepts. 
+
+plots %>% count(ASSOCIATION) 
+
+plots %>% filter(ASSOCIATION == 'DONE') %>% 
+  summarize(plotsInDoneESDs  = sum(UFOPlots)) # 16 of these Ecological Site Descriptions, representing 91 plots, were complete and listed 'Similar' and 'Associated' sites within the Description. 
+
+plots %>% filter(ASSOCIATION == 'NONE LISTED') # Two of these ESD's, with seven plots in them, had no listed Similar of Associated ecological sites. 
+
+plots %>% filter(ASSOCIATION == 'NOT WRITTEN') %>% summarize(sum(UFOPlots))
+plots %>% filter(ASSOCIATION == 'NOT FOUND') %>% summarize(sum(UFOPlots))
+# the remaining Ecological sites had either no descriptions completed (7 Ecological Sites, 8 plots), or were not found on EDIT (10 Ecological Sites, 16 plots), indicative of nascent draft descriptions. 
+
+
 # plot the number of new nodes found per iteration
 
-n1 <- second_esds %>% 
+focal <- second_esds %>% 
+  filter(LINK == 'FOCAL') %>% 
+  distinct(FROM, .keep_all = T) %>% 
+  mutate(LINK = 0) 
+
+focal_n <- focal %>% 
+  group_by(LINK) %>% 
+  count()
+
+esd_per_links_from_focal <- second_esds %>% 
   split(.$LINK) %>% 
   map(~ .x %>% 
         filter(., !TO %in% .$FROM) %>% 
         distinct(TO, .keep_all = T)) %>% 
   bind_rows() %>% 
-  group_by(LINK) %>% 
-  count() %>% 
   mutate(LINK = case_when(
-    LINK == 'FOCAL' ~ 0,
-    LINK == 'FIRST' ~ 1,
-    LINK == 'SECOND' ~ 2
+    LINK == 'FOCAL' ~ 1,
+    LINK == 'FIRST' ~ 2,
+    LINK == 'SECOND' ~ 3
   ))
 
-ggplot(n1, aes( x = LINK, y = n)) +
+esd_per_links_from_focal_n <- esd_per_links_from_focal %>% 
+  group_by(LINK) %>% 
+  count() %>% 
+  bind_rows(focal_n, .)
+
+
+ggplot(esd_per_links_from_focal_n, aes( x = LINK, y = n)) +
   geom_line() +
   theme_classic() +
   labs(
@@ -84,6 +124,10 @@ ggplot(n1, aes( x = LINK, y = n)) +
   scale_x_continuous(breaks=c(0,1,2)) +
   theme(plot.title = element_text(hjust = 0.5))
 
+# rm(focal_n, esd_per_links_from_focal_n)
+
+
+rm(focal, esd_per_links_from_focal)
 
 esds <- second_esds %>% select(FROM, TO, TYPE)
 graph <- as.undirected(graph_from_data_frame(esds))
@@ -127,7 +171,7 @@ plot(graph, vertex.label = NA,
 #                    pt.bg=node_clrs, 
 #                    pt.cex=2, cex=.8, bty="n", ncol=1)
 
-#dev.off()s
+#dev.off()
 
 rm(lay, n1, cols, cols_trans, i)
 

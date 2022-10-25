@@ -1,0 +1,310 @@
+---
+title: "GraphModulesESDsReport"
+author: "steppe"
+date: "2022-10-25"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+
+# Ecological Site Associations
+
+
+## Background
+Many Ecological Sites (ES) in the study area had few AIM plots occur on them. Furthermore,
+many of the Ecological Sites Descriptions (ESD) do not contain information on vegetation states and phases, nor benchmarks of species covers in any of these state and phase combinations. We interpret these findings as indicative of the relative rarity of these Ecological Sites across the landscape.
+
+In order to provide context for the status of land in Ecological Sites which were missing vegetation information, or even an ESD, we utilized graph theory to group AIM sites by similarity to increase the members of these interpretive groups. To accomplish this goal each ES concept which an AIM plot was placed in had a section of its ESD which lists 'Similar' or 'Associated' ES concepts transcribed from Jornada EDIT in October 2022. We refer to the original ES concepts which our AIM plots were placed into as 'Focal', and the immediately listed Associated & Similar sites as the first 'link'. From the first 'linked' ecological sites we transcribed the Associated & Similar ES concepts up to the fourth link from our focal sites. Along this process we judiciously rejected far linked ES concepts from distant MLRA's; i.e. gypsiferous concepts from the Chihuahuan Desert in Southern New Mexico (e.g. MLRA 42B/C), and forested concepts from the Southern Wasatch Range (MLRA 47X). 
+
+```{r Load libraries, message  = F , warning = F, echo = F}
+library(here)
+library(tidyverse)
+library(igraph)
+library(colorspace)
+set.seed(50)
+```
+
+
+```{r load data preliminary processing and tidy, message = F, warning = F, echo = F, results = 'hide'}
+
+p <- file.path('/media/sagesteppe/ExternalHD/GraphModulesEsds/data/processed')
+focal_esds <- read.csv(file.path(p, 'focalESDs.csv')) 
+first_esds <- read.csv(file.path(p, 'firstESDs.csv')) %>% 
+  filter(TYPE != 'REJECTED') # THESE FAR SOUTH NEW MEXICO
+second_esds <- read.delim(file.path(p, 'secondESDs.csv')) %>% 
+  filter(TYPE != 'REJECTED') # THESE NEW MEXICO OR SMALL POCKETS IN CENTRAL UT
+third_esds <- read.delim(file.path(p, 'thirdESDs.csv')) %>% 
+  filter(TYPE != 'REJECTED') %>% 
+  mutate(across(.cols = c(FROM, TO), ~str_replace(.x, '^[R]O', 'R0')))
+
+#plots <- read.csv(file.path('/media/sagesteppe/ExternalHD/GraphModulesEsds/data/raw', 
+#                    'sitesFORreferences.csv')) %>% 
+#  filter(EcologicalSiteId != 'UNKNOWN')
+
+status <- read.csv(file.path(p, 'ESDpublicationStatus.csv')) %>% 
+  select(EcologicalSiteId, ASSOCIATION) %>% 
+  filter(str_detect(ASSOCIATION, '^NO')) # these are missing descriptions. 
+
+# we have collected the ESDs associated with the focal ESDs, which have plots
+# representative of them from our sample design (EDIT JORNADA on 10.19.2022. 
+# We will now move 1 link away from our AIM plots.
+
+focal_esds %>% 
+  filter(!TO %in% FROM) %>% 
+  select(FROM = 'TO') %>% # do this we can just rbind later ;-)
+  distinct() %>% 
+  mutate('ASSOCIATION' = '', 
+         'TO' = '') %>% 
+  write.csv(file.path(p,'first.csv'), row.names = F)
+
+# now two links away from our AIM Plots
+first_esds %>% 
+  mutate(across(.cols = c(FROM, TO), ~str_replace(.x, '^[R]O', 'R0'))) %>% 
+  filter(!TO %in% FROM) %>% 
+  # which esds are just missing/?
+  filter(!TO %in% status$EcologicalSiteId, # silly nm ones dealt w/ below.
+         !TO %in% c('R042BB006NM', 'R042BB014NM'))  %>% 
+  select(FROM = TO) %>% 
+  distinct() %>% 
+  mutate('ASSOCIATION' = '', 
+         'TO' = '') %>% 
+  write.csv(file.path(p,'second.csv'), row.names = F)
+
+# three links away
+second_esds %>% 
+  mutate(across(.cols = c(FROM, TO), ~str_replace(.x, '^[R]O', 'R0'))) %>% 
+  filter(!TO %in% FROM) %>% 
+  # which esds are just missing/?
+  filter(!TO %in% status$EcologicalSiteId, # silly nm removed below
+         !TO %in% c('R042BB006NM', 'R042BB014NM')) %>% 
+  select(FROM = TO) %>% 
+  distinct() %>% 
+  mutate('ASSOCIATION' = '', 
+         'TO' = '') %>% 
+  write.csv(file.path(p, 'third.csv'), row.names = F)
+
+rm(status, focal_esds, first_esds)
+```
+
+
+```{r Simple results on number of found ESDs, echo = F, results = 'hide'}
+
+# RESULT ONE - HOW MANY PLOTS HAD THEIR ESD'S VERIFIED?
+praw <- '/media/sagesteppe/ExternalHD/GraphModulesEsds/data/raw'
+
+# RESULT TWO - HOW MANY ESD'S HAD WRITTEN DESCRIPTIONS COMPLETED?
+
+plots <- read.csv(file.path(praw, 'found_ESDs.csv')) %>% 
+  filter(EcologicalSiteId != 'UNKNOWN') 
+
+AIM_plots_w_ES <- sum(plots$UFOPlots) # 122 AIM Plots were placed into 
+focal_ES <- nrow(plots) # 35 Ecological sites concepts. 
+
+doneESD <- plots %>% count(ASSOCIATION) %>% 
+  filter(ASSOCIATION == 'DONE') %>% 
+  select(n)
+PlotsinDoneESDs <- plots %>% filter(ASSOCIATION == 'DONE') %>% 
+  summarize(plotsInDoneESDs  = sum(UFOPlots)) # 16 of these Ecological Site Descriptions, representing 91 plots, were complete and listed 'Similar' and 'Associated' sites within the Description. 
+
+noneListed <- plots %>% filter(ASSOCIATION == 'NONE LISTED') %>% nrow() %>% as.numeric()
+noneListedPlots <- plots %>% filter(ASSOCIATION == 'NONE LISTED') %>% summarize(sum(UFOPlots))
+# Two of these ESD's, with seven plots in them, had no listed Similar of Associated ecological sites. 
+
+esd_notWritten <- plots %>% filter(ASSOCIATION == 'NOT WRITTEN') %>% nrow()
+esd_notFound <- plots %>% filter(ASSOCIATION == 'NOT FOUND') %>% nrow()
+
+plots_notWritten <- plots %>% filter(ASSOCIATION == 'NOT WRITTEN') %>% summarize(sum(UFOPlots))
+plots_notFound <- plots %>% filter(ASSOCIATION == 'NOT FOUND') %>% summarize(sum(UFOPlots))
+# the remaining Ecological sites had either no descriptions completed (7 Ecological Sites, 8 plots), or were not found on EDIT (10 Ecological Sites, 16 plots), indicative of nascent draft descriptions. 
+
+rm(p)
+```
+
+## Results 
+
+`r toString(AIM_plots_w_ES)` AIM Plots were placed into `r toString(focal_ES)` Ecological sites concepts. `r toString(doneESD)` of these Ecological Site Descriptions, representing `r toString(PlotsinDoneESDs)` plots, were complete and listed 'Similar' and 'Associated' sites within the Description. `r toString(noneListed)` of these ESD's, with `r toString(noneListedPlots)` AIM plots in them, had no listed Similar of Associated ecological sites. The remaining Ecological sites had either no descriptions completed (`r toString(esd_notWritten)` ES, `r toString (plots_notWritten)` AIM plots), or were not found on EDIT (`r toString(esd_notFound)` ES, `r toString(plots_notFound)` AIM plots), both indicative of nascent draft descriptions but developed concepts. 
+
+```{r cleanup result counts, echo = F, results = 'hide', message = F}
+rm(AIM_plots_w_ES, focal_ES, doneESD, PlotsinDoneESDs, noneListed, 
+   noneListedPlots, esd_notWritten, esd_notFound, 
+   plots_notWritten, plots_notFound)
+```
+
+```{r, echo = F, results = 'hide'}
+# plot the number of new nodes found per iteration
+
+focal <- third_esds %>% 
+  filter(LINK == 'FOCAL') %>% 
+  distinct(FROM, .keep_all = T) %>% 
+  mutate(LINK = 0) 
+
+focal_n <- focal %>% 
+  group_by(LINK) %>% 
+  count()
+
+esd_per_links_from_focal <- third_esds %>% 
+  split(.$LINK) %>% 
+  map(~ .x %>% 
+        filter(., !TO %in% .$FROM) %>% 
+        distinct(TO, .keep_all = T)) %>% 
+  bind_rows() %>% 
+  mutate(LINK = case_when(
+    LINK == 'FOCAL' ~ 1,
+    LINK == 'FIRST' ~ 2,
+    LINK == 'SECOND' ~ 3,
+    LINK == 'THIRD' ~ 4
+  )) %>% 
+  arrange(LINK) %>% 
+  distinct(FROM, .keep_all = T)
+
+esd_per_links_from_focal_n <- esd_per_links_from_focal %>% 
+  group_by(LINK) %>% 
+  count() %>% 
+  bind_rows(focal_n, .)
+
+```
+
+
+The number of associated and similar Ecological Site per focal ESD decrease as a function of link distance from the AIM plots (see figure 1.). While we did not follow the linkages until no new novel ES concepts were returned, we are fairly confident that the relationship between any two ES in the study area were uncovered by linkage four.
+
+```{r Number of Esds per function of link distance, echo = F, message = F, warning = F, fig.height=3, fig.width=3, fig.cap = "Fig. 1. Link '0' is the position at which only the focal ESDs are present. Link '1' represents their immediate associations, and '2' the link to those, so on. We see that a steep decline occurs along the horizontal axis indicating our link search method results in efffectively comphrensive groups."}
+
+ggplot(esd_per_links_from_focal_n, aes( x = LINK, y = n)) +
+  geom_line() +
+  theme_classic() +
+  labs(
+    title = "Number of unique ESD's\nat links from AIM Plots",
+       y = 'Number of novel ESDs', x = 'Link Distance') +
+  lims(y = c(0,50)) +
+  scale_x_continuous(breaks=c(0,1,2,3,4)) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# rm(focal_n, esd_per_links_from_focal_n)
+rm(focal, esd_per_links_from_focal, esd_per_links_from_focal_n, focal_n)
+```
+
+
+```{r echo = F, warnign = F, fig.cap = "Figure 2. A network with a layout calculated using the Fruchterman-Reingold Algorithm."}
+
+esds <- second_esds %>% select(FROM, TO, TYPE)
+graph <- as.undirected(graph_from_data_frame(esds))
+lay <- layout_with_fr(graph) 
+
+communityMulti <- cluster_louvain(graph)
+modularity_value <- round(modularity(graph, membership(communityMulti)), 2)
+noModules <- length(communityMulti)
+
+cols <- qualitative_hcl(9, palette = "Dark 3")
+
+V(graph)$degree <- degree(graph)
+V(graph)$color <- membership(communityMulti) 
+
+for (i in 1:max(membership(communityMulti))){
+  V(graph)$color[V(graph)$color == i] <- cols[i]
+}
+
+cols_trans <- adjust_transparency(cols, alpha = 0.3) 
+legend_text <- c('Flats & Bottoms',
+                 'Sagebrush',
+                 'Pinyon-Juniper', 
+                 'Salt-Desert',
+                 'Escarpments',
+                 'Alkali-Deserts',
+                 'Gypsiferous Deserts',
+                 'PJ - Savannahs, W* Pl.',
+                 'Flats & Bottoms W* Pl.'
+                 )
+
+par(bg = 'black', mar=c(5,0,2,0))
+plot(graph, vertex.label = NA,
+     shape = 'sphere',
+     mark.groups = communityMulti,
+     mark.col = cols_trans,
+     mark.border = NA,
+     edge.color = 'white',
+     lty = 2,
+     vertex.size = V(graph)$degree, 
+     layout = lay,
+     edge.curved = 0.2
+     ) 
+  title('Associated Ecological Sites',
+        col.main = "white") 
+  legend(x= -1.25, y=-1.1, legend_text, x.intersp = 1.0, text.width = 1.0,
+                    pch=21, col="#777777", 
+                    pt.bg = cols, text.col= "white",
+                    pt.cex = 1, cex = .8, bty = "n", ncol = 2)
+
+invisible(dev.off())
+
+members  <- tibble(
+  'to' = 1:length(communityMulti$membership),
+  'Module' = communityMulti$membership
+)
+
+esd_graph <- as_long_data_frame(graph) %>%
+  left_join(., members, by = 'to')
+
+rm(cols, cols_trans, i, legend_text, communityMulti, graph, lay, members,
+   second_esds)
+```
+
+Using igraph, as implemented in R, a binary network (i.e. each link between Ecological Sites is either present or absent, without regards to interaction strengths) was created The Louvain method of community detection, with default settings, was used, to identify `r toString(noModules)` modules in the ESD network (*modularity scores range from 0 to 1, and indicate the clustering of links within versus outside of community*, ours is `r toString(modularity_value)`).  Following module detection the ESD's of each module component were reviewed to find uniting characteristics to provide colloquial names for the clusters.
+
+```{r remove values used to described modules, message = F, echo = F}
+rm(modularity_value, noModules)
+```
+
+
+```{r write out graph results, echo = F, message = F, eval = F}
+
+esd_graph %>% mutate(module_name = case_when(
+  
+  Module == 1 ~ 'Flats-Bottoms',
+  Module == 2 ~ 'Sagebrush',
+  Module == 3 ~ 'PinyonJuniper',
+  Module == 4 ~ 'SaltDesert',
+  Module == 5 ~ 'Escarpments',
+  Module == 6 ~ 'AlkaliDeserts',
+  Module == 7 ~ 'GypsiferousDeserts',
+  Module == 8 ~ 'PJ-SavannahsW', 
+  Module == 9 ~ 'Flats-BottomsW'
+  
+))  %>% 
+  select('ESD' = from_name, module_name, module_number = Module)
+
+write.csv(esd_graph, file.path(p, 'ESDs_in_modules.csv'))
+```
+
+
+```{r, eval = F}
+
+R036XY328CO, R036XY325CO, R036XY405CO 
+# flats and bottoms UFO -  # currently 1
+
+R034BY251UT, R034BY212UT, R034BY227UT, R034BY205UT, R034BY225UT
+# Wyoming sage brush # currently 2
+
+R036XY114CO, R036XY113CO, R036XY287CO, R036XY111CO, R036XY445CO, R036XY142CO
+# Pinyon-Juniper module currently # 3
+
+R034BY117UT, R034BY106UT
+# salt desert - Mat Saltbush  # currently 4
+
+R048AY443UT, R048AY334UT
+# Cliff-edge and escarpment loam soils # currently 5
+
+R034BY006UT, R034BY112UT, R034BY115UT
+# Alkali desert - SAVE4, ATCO # currently 6
+
+R042XB036NM
+# Gypsiferous - currently 7
+
+R035XY246UT, R035XY239UT, R035XY246UT, R035XY221UT, R035XY260UT
+# W* CO plateau PJ - to PJ savannas  - currently 8
+
+R035XY215UT, R035XY011UT, R035XY003UT, R035XY009UT
+# flats and bottoms - Utah # currently 9 
+
+```
+
