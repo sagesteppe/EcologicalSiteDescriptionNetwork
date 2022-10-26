@@ -6,5 +6,5 @@ In general the landscapes with ESD's completed are *somewhat* homogenous. Howeve
 
 Here we utilize an Assess, Inventory, and Monitor (AIM) sample design, which had ESD verification occur at 130 plots to serve as a focal group of ESD's. From this focal group we branch outwards along the ESD documents 'similar and associated sites' (this name... my own) sections to develop a framework for relating the ESD's using simple binary and undirected associations. 
 
-![BigRedBillWalton](./results/ESDGraph.jpg)
+![ESDGraph](./results/ESDGraph.png)
 
