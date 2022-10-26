@@ -12,6 +12,7 @@ output:
 
 
 ## Background
+
 Many Ecological Sites (ES) in the study area had few AIM plots occur on them. Furthermore,
 many of the Ecological Sites Descriptions (ESD) do not contain information on vegetation states and phases, nor benchmarks of species covers in any of these state and phase combinations. We interpret these findings as indicative of the relative rarity of these Ecological Sites across the landscape.
 
@@ -161,14 +162,13 @@ esd_per_links_from_focal <- third_esds %>%
 esd_per_links_from_focal_n <- esd_per_links_from_focal %>% 
   group_by(LINK) %>% 
   count() %>% 
-  bind_rows(focal_n, .)
+  bind_rows(focal_n, .) 
 
 ```
 
+The number of associated and similar Ecological Site per focal ESD decrease as a function of link distance from the AIM plots (see figure 1.). While we did not follow the linkages until no new novel ES concepts were returned, we are fairly confident that the relationship between any two ES in the study area were uncovered by linkage three. In our opinion by linkage four many of the relationships were for PJ sites located along the Western edge of the Colorado Plateau. The similarity of these sites to our focal sites is questionable until NRCS reviews concepts from across MLRA's and we omit them from our groupings here. 
 
-The number of associated and similar Ecological Site per focal ESD decrease as a function of link distance from the AIM plots (see figure 1.). While we did not follow the linkages until no new novel ES concepts were returned, we are fairly confident that the relationship between any two ES in the study area were uncovered by linkage four.
-
-```{r Number of Esds per function of link distance, echo = F, message = F, warning = F, fig.height=3, fig.width=3, fig.cap = "Fig. 1. Link '0' is the position at which only the focal ESDs are present. Link '1' represents their immediate associations, and '2' the link to those, so on. We see that a steep decline occurs along the horizontal axis indicating our link search method results in efffectively comphrensive groups."}
+```{r Number of Esds per function of link distance, echo = F, message = F, warning = F, fig.height=3, fig.width=3, fig.cap = "Fig. 1. Link '0' is the position at which only the focal ESDs are present. Link '1' represents their immediate associations, and '2' the link to those, so on. We see that a steep decline occurs along the horizontal axis indicating our link search method results in effectively comprehensive groups."}
 
 ggplot(esd_per_links_from_focal_n, aes( x = LINK, y = n)) +
   geom_line() +
@@ -180,7 +180,6 @@ ggplot(esd_per_links_from_focal_n, aes( x = LINK, y = n)) +
   scale_x_continuous(breaks=c(0,1,2,3,4)) +
   theme(plot.title = element_text(hjust = 0.5))
 
-# rm(focal_n, esd_per_links_from_focal_n)
 rm(focal, esd_per_links_from_focal, esd_per_links_from_focal_n, focal_n)
 ```
 
@@ -216,7 +215,8 @@ legend_text <- c('Flats & Bottoms',
                  'Flats & Bottoms W* Pl.'
                  )
 
-par(bg = 'black', mar=c(5,0,2,0))
+png(width = 720, height = 720, filename = '../results/ESDGraph.png')
+par(bg = 'black', mar=c(7,0,2,0))
 plot(graph, vertex.label = NA,
      shape = 'sphere',
      mark.groups = communityMulti,
@@ -230,10 +230,18 @@ plot(graph, vertex.label = NA,
      ) 
   title('Associated Ecological Sites',
         col.main = "white") 
-  legend(x= -1.25, y=-1.1, legend_text, x.intersp = 1.0, text.width = 1.0,
+  
+# USE THESE SIZES FOR EXTRACTING IMAGES
+ legend(x= -1.0, y=-1.1, legend_text, x.intersp = 1.0, text.width = 1.0,
                     pch=21, col="#777777", 
                     pt.bg = cols, text.col= "white",
-                    pt.cex = 1, cex = .8, bty = "n", ncol = 2)
+                    pt.cex = 2, cex = 1.5, bty = "n", ncol = 2)
+  
+# USE THESE SIZES FOR DOCUMENTING TO MICROSOFT WORD
+# legend(x= -1.25, y=-1.1, legend_text, x.intersp = 1.0, text.width = 1.0,
+#                    pch=21, col="#777777", 
+#                    pt.bg = cols, text.col= "white",
+#                    pt.cex = 1, cex = .8, bty = "n", ncol = 2)
 
 invisible(dev.off())
 
@@ -245,8 +253,8 @@ members  <- tibble(
 esd_graph <- as_long_data_frame(graph) %>%
   left_join(., members, by = 'to')
 
-rm(cols, cols_trans, i, legend_text, communityMulti, graph, lay, members,
-   second_esds)
+#rm(cols, cols_trans, i, legend_text, communityMulti, graph, lay, members,
+#   second_esds)
 ```
 
 Using igraph, as implemented in R, a binary network (i.e. each link between Ecological Sites is either present or absent, without regards to interaction strengths) was created The Louvain method of community detection, with default settings, was used, to identify `r toString(noModules)` modules in the ESD network (*modularity scores range from 0 to 1, and indicate the clustering of links within versus outside of community*, ours is `r toString(modularity_value)`).  Following module detection the ESD's of each module component were reviewed to find uniting characteristics to provide colloquial names for the clusters.
@@ -273,7 +281,7 @@ esd_graph %>% mutate(module_name = case_when(
 ))  %>% 
   select('ESD' = from_name, module_name, module_number = Module)
 
-write.csv(esd_graph, file.path(p, 'ESDs_in_modules.csv'))
+write.csv(esd_graph, file.path(p, '../results/ESDs_in_modules.csv'))
 ```
 
 
