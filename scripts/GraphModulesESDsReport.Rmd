@@ -1,10 +1,10 @@
 ---
-title: "GraphModulesESDsReport"
-author: "steppe"
-date: "2022-10-25"
+title: "Ecological Site Associations"
+author: NULL
+date: NULL
 output:
-  word_document: default
   pdf_document: default
+  word_document: default
 ---
 
 
@@ -13,8 +13,7 @@ output:
 
 ## Background
 
-Many Ecological Sites (ES) in the study area had few AIM plots occur on them. Furthermore,
-many of the Ecological Sites Descriptions (ESD) do not contain information on vegetation states and phases, nor benchmarks of species covers in any of these state and phase combinations. We interpret these findings as indicative of the relative rarity of these Ecological Sites across the landscape.
+Many Ecological Sites (ES) in the study area had few AIM plots occur on them. Furthermore, many of the Ecological Sites Descriptions (ESD) do not contain information on vegetation states and phases, nor benchmarks of species covers in any of these state and phase combinations. We interpret these findings as indicative of the relative rarity of these Ecological Sites across the landscape.
 
 In order to provide context for the status of land in Ecological Sites which were missing vegetation information, or even an ESD, we utilized graph theory to group AIM sites by similarity to increase the members of these interpretive groups. To accomplish this goal each ES concept which an AIM plot was placed in had a section of its ESD which lists 'Similar' or 'Associated' ES concepts transcribed from Jornada EDIT in October 2022. We refer to the original ES concepts which our AIM plots were placed into as 'Focal', and the immediately listed Associated & Similar sites as the first 'link'. From the first 'linked' ecological sites we transcribed the Associated & Similar ES concepts up to the fourth link from our focal sites. Along this process we judiciously rejected far linked ES concepts from distant MLRA's; i.e. gypsiferous concepts from the Chihuahuan Desert in Southern New Mexico (e.g. MLRA 42B/C), and forested concepts from the Southern Wasatch Range (MLRA 47X). 
 
@@ -184,7 +183,7 @@ rm(focal, esd_per_links_from_focal, esd_per_links_from_focal_n, focal_n)
 ```
 
 
-```{r echo = F, warnign = F, fig.cap = "Figure 2. A network with a layout calculated using the Fruchterman-Reingold Algorithm."}
+```{r echo = F, warnign = F, fig.cap = "A network with a layout calculated using the Fruchterman-Reingold Algorithm."}
 
 esds <- second_esds %>% select(FROM, TO, TYPE)
 graph <- as.undirected(graph_from_data_frame(esds))
@@ -266,7 +265,7 @@ rm(modularity_value, noModules)
 
 ```{r write out graph results, echo = F, message = F, eval = F}
 
-esd_graph %>% mutate(module_name = case_when(
+esd_graph <- esd_graph %>% mutate(module_name = case_when(
   
   Module == 1 ~ 'Flats-Bottoms',
   Module == 2 ~ 'Sagebrush',
@@ -279,13 +278,20 @@ esd_graph %>% mutate(module_name = case_when(
   Module == 9 ~ 'Flats-BottomsW'
   
 ))  %>% 
-  select('ESD' = from_name, module_name, module_number = Module)
+  select('ESD' = from_name, module_name, module_number = Module) %>% 
+  arrange(module_number)
 
-write.csv(esd_graph, file.path(p, '../results/ESDs_in_modules.csv'))
+p <- file.path('/media/sagesteppe/ExternalHD/GraphModulesEsds')
+write.csv(esd_graph,  '../results/ESDs_in_modules.csv', row.names = F)
+
+esd_graph %>% 
+  distinct(.keep_all = T) %>% 
+  write.csv(., '../results/ESDs_in_modules-truncated.csv', row.names = F)
+
 ```
 
 
-```{r, eval = F}
+```{r, eval = F, echo = F}
 
 R036XY328CO, R036XY325CO, R036XY405CO 
 # flats and bottoms UFO -  # currently 1
